@@ -85,12 +85,6 @@
         .square-dark.highlight {
             background-color: #eab308 !important;
         }
-        .square-light.last-move {
-            background-color: #cbd5e1 !important;
-        }
-        .square-dark.last-move {
-            background-color: #2563eb !important;
-        }
         /* Neon glow effects */
         .glow-cyan {
             box-shadow: 0 0 20px rgba(6, 182, 212, 0.35);
@@ -149,7 +143,7 @@
                     Master the Board in <span class="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">Bhess3</span>
                 </h2>
                 <p class="text-gray-400 text-lg max-w-xl mx-auto lg:mx-0">
-                    Challenge smart AI bots across 3 difficulty tiers, or instantly create a private party room to battle friends online with instant code sharing.
+                    Challenge smart AI bots across 3 difficulty tiers, or instantly create a private party room to battle friends online with interactive draw and resignation support.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
                     <button onclick="showSection('view-party-setup')" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold shadow-lg shadow-cyan-500/25 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3 text-base">
@@ -310,7 +304,7 @@
         <!-- VIEW 4: CHESS GAME ARENA -->
         <div id="view-game" class="view-section hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-start py-4">
             
-            <!-- Left/Top Sidebar: Player Info & Captured Pieces -->
+            <!-- Left/Top Sidebar: Player Info & Move History -->
             <div class="lg:col-span-4 flex flex-col space-y-4">
                 <!-- Opponent Card -->
                 <div class="bg-dark-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between shadow-lg">
@@ -366,7 +360,7 @@
                         <i class="fa-solid fa-flag"></i>
                         <span>Resign</span>
                     </button>
-                    <button onclick="openDrawModal()" class="py-2.5 rounded-xl bg-dark-700 hover:bg-dark-600 text-gray-300 font-semibold text-sm transition border border-gray-700 flex items-center justify-center space-x-2">
+                    <button onclick="offerDraw()" class="py-2.5 rounded-xl bg-dark-700 hover:bg-dark-600 text-gray-300 font-semibold text-sm transition border border-gray-700 flex items-center justify-center space-x-2">
                         <i class="fa-solid fa-handshake"></i>
                         <span>Offer Draw</span>
                     </button>
@@ -420,6 +414,27 @@
         </div>
     </div>
 
+    <!-- MODAL: Draw Offer Dialog (For Opponent) -->
+    <div id="modal-draw-offer" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-dark-800 border border-amber-500/40 rounded-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-6 shadow-2xl">
+            <div class="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto shadow-inner">
+                <i class="fa-solid fa-handshake"></i>
+            </div>
+            <div>
+                <h3 class="text-2xl font-bold font-heading">Draw Offered</h3>
+                <p class="text-gray-400 text-sm mt-2">Your opponent has offered a draw. Do you accept?</p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="declineDrawOffer()" class="flex-1 py-3 rounded-xl bg-dark-700 hover:bg-dark-600 font-bold transition text-gray-300">
+                    Decline
+                </button>
+                <button onclick="acceptDrawOffer()" class="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold transition text-dark-900 shadow-md shadow-amber-500/25">
+                    Accept Draw
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: Game Over Dialog -->
     <div id="modal-gameover" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-dark-800 border border-gray-700 rounded-2xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl">
@@ -456,15 +471,15 @@
             <div class="space-y-4 text-sm text-gray-300 leading-relaxed">
                 <div>
                     <h4 class="font-bold text-cyan-400 mb-1">Party Mode</h4>
-                    <p>Create a party to generate a 6-character room code. Share this code with a friend so they can join your room. Both players will play in real-time synced via browser storage.</p>
+                    <p>Create a party to generate a 6-character room code. Share this code with a friend so they can join your room. Both players will play in real-time synced via secure room updates.</p>
                 </div>
                 <div>
-                    <h4 class="font-bold text-purple-400 mb-1">Play vs Bot</h4>
-                    <p>Practice against custom AI engines ranging from Easy (~800 ELO) to Hard (~2200 ELO). Choose your starting color and test your tactical openings.</p>
+                    <h4 class="font-bold text-purple-400 mb-1">Draws & Resignations</h4>
+                    <p>When offering a draw or resigning, your opponent receives an interactive prompt instantly. Victories and defeats update stats for both players.</p>
                 </div>
                 <div>
                     <h4 class="font-bold text-emerald-400 mb-1">Chess Controls</h4>
-                    <p>Click any of your pieces to highlight legal move squares, then click a highlighted destination square to make your move. Standard chess rules apply (castling, en passant, promotion, checkmate).</p>
+                    <p>Click any of your pieces to highlight legal move squares, then click a highlighted destination square to make your move.</p>
                 </div>
             </div>
             <button onclick="closeRulesModal()" class="w-full py-3 rounded-xl bg-dark-700 hover:bg-dark-600 font-bold transition text-white">
@@ -493,7 +508,7 @@
         let stats = JSON.parse(localStorage.getItem('bhess3_stats')) || { wins: 0, losses: 0, draws: 0 };
         updateStatsUI();
 
-        // Unified piece symbols (using preferred clean white piece set for both sides with subtle dark border/contrast for black)
+        // Unified piece symbols (using preferred clean white piece style for both sides with contrast outline)
         const pieceSymbols = {
             'p': { w: '♙', b: '♙' },
             'r': { w: '♖', b: '♖' },
@@ -552,7 +567,6 @@
             selectedSquare = null;
             legalMoves = [];
             
-            // Update UI headers
             document.getElementById('opponent-avatar').innerHTML = '<i class="fa-solid fa-robot"></i>';
             document.getElementById('opponent-name').innerText = `Bot (${botDifficulty.toUpperCase()})`;
             document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span><span>Online</span>';
@@ -563,7 +577,6 @@
             renderBoard();
             updateGameUI();
 
-            // If player chose black, bot makes first move
             if (playerColor === 'black') {
                 setTimeout(makeBotMove, 500);
             }
@@ -579,16 +592,17 @@
             selectedSquare = null;
             legalMoves = [];
 
-            // Save initial room state to localStorage
             localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify({
                 fen: game.fen(),
                 history: game.history(),
                 turn: game.turn(),
                 status: 'active',
+                gameStatus: 'active',
+                drawOfferBy: null,
+                resignedBy: null,
                 lastUpdate: Date.now()
             }));
 
-            // Update UI
             document.getElementById('opponent-avatar').innerHTML = '<i class="fa-solid fa-users"></i>';
             document.getElementById('opponent-name').innerText = 'Waiting for opponent...';
             document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block"></span><span>Waiting</span>';
@@ -627,7 +641,6 @@
 
             game.load(roomObj.fen);
 
-            // Update UI
             document.getElementById('opponent-avatar').innerHTML = '<i class="fa-solid fa-user-shield"></i>';
             document.getElementById('opponent-name').innerText = 'Host (White)';
             document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span><span>Connected</span>';
@@ -644,7 +657,6 @@
         function startPartySync() {
             stopPartySync();
             lastSyncedFen = game.fen();
-            // Optimized interval (350ms) for snappy real-time party updates
             partySyncInterval = setInterval(() => {
                 if (!partyCode) return;
                 const roomData = localStorage.getItem(`bhess3_room_${partyCode}`);
@@ -656,13 +668,34 @@
                     document.getElementById('opponent-name').innerText = 'Guest (Black)';
                 }
 
-                // Check for game status changes (e.g. resignation, draw, checkmate)
+                // Check Draw Offer
+                if (roomObj.drawOfferBy && roomObj.drawOfferBy !== playerColor && lastSyncedStatus === 'active') {
+                    // Show draw offer modal to this player
+                    document.getElementById('modal-draw-offer').classList.remove('hidden');
+                    // Clear offer flag so it doesn't pop repeatedly
+                    roomObj.drawOfferBy = null;
+                    localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify(roomObj));
+                }
+
+                // Check Resignation / Game status
                 if (roomObj.gameStatus && roomObj.gameStatus !== 'active' && lastSyncedStatus === 'active') {
                     lastSyncedStatus = roomObj.gameStatus;
                     if (roomObj.gameStatus === 'resigned') {
-                        triggerGameOverModal("Resignation", roomObj.resignationMessage || "Match ended by resignation.");
+                        const winner = roomObj.winner === playerColor ? 'Victory!' : 'Defeat!';
+                        const sub = roomObj.winner === playerColor ? 'Opponent resigned. You win the match!' : 'You resigned. Opponent wins!';
+                        if (roomObj.winner === playerColor) {
+                            stats.wins++;
+                        } else {
+                            stats.losses++;
+                        }
+                        localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+                        updateStatsUI();
+                        triggerGameOverModal(winner, sub, roomObj.winner === playerColor);
                     } else if (roomObj.gameStatus === 'draw') {
-                        triggerGameOverModal("Match Drawn", "The game ended in a draw.");
+                        stats.draws++;
+                        localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+                        updateStatsUI();
+                        triggerGameOverModal("Match Drawn", "Both players agreed to a draw.", false);
                     }
                 }
 
@@ -688,6 +721,7 @@
         function pushPartyState(extraFields = {}) {
             if (gameMode !== 'party' || !partyCode) return;
             lastSyncedFen = game.fen();
+            const existing = JSON.parse(localStorage.getItem(`bhess3_room_${partyCode}`) || '{}');
             const payload = {
                 fen: game.fen(),
                 history: game.history(),
@@ -695,13 +729,13 @@
                 status: 'active',
                 gameStatus: lastSyncedStatus,
                 lastUpdate: Date.now(),
+                ...existing,
                 ...extraFields
             };
             localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify(payload));
         }
 
-        // --- STREAMING_CHUNK:Building Chess Rendering & Interaction Logic... ---
-        // RENDER CHESSBOARD
+        // --- CHESSBOARD RENDER & INTERACTION ---
         function renderBoard() {
             const container = document.getElementById('chessboard-container');
             container.innerHTML = '';
@@ -733,15 +767,9 @@
                     }
 
                     if (piece) {
-                        // Unified piece styling (using preferred white piece look for both sides with black pieces outlined/contrasted)
                         const symbol = pieceSymbols[piece.type][piece.color];
                         const span = document.createElement('span');
-                        if (piece.color === 'w') {
-                            span.className = 'z-0 text-gray-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] transform transition hover:scale-110';
-                        } else {
-                            // Unified preferred style with distinct outline/contrast for black pieces so they stand out clearly
-                            span.className = 'z-0 text-gray-100 drop-shadow-[0_0_2px_#000,0_0_2px_#000,0_2px_4px_rgba(0,0,0,0.9)] transform transition hover:scale-110';
-                        }
+                        span.className = 'z-0 text-gray-100 drop-shadow-[0_0_2px_#000,0_0_2px_#000,0_2px_4px_rgba(0,0,0,0.9)] transform transition hover:scale-110';
                         span.innerText = symbol;
                         sqDiv.appendChild(span);
                     }
@@ -752,9 +780,7 @@
             }
         }
 
-        // SQUARE CLICK HANDLER
         function handleSquareClick(square) {
-            // Check if it's player's turn
             const turnChar = game.turn() === 'w' ? 'white' : 'black';
             if (gameMode === 'bot' && turnChar !== playerColor) return;
             if (gameMode === 'party' && turnChar !== playerColor) return;
@@ -763,7 +789,6 @@
             const piece = game.get(square);
 
             if (selectedSquare === null) {
-                // Select piece if it belongs to current player
                 if (piece && piece.color === game.turn()) {
                     selectedSquare = square;
                     const moves = game.moves({ square: square, verbose: true });
@@ -772,12 +797,10 @@
                 }
             } else {
                 if (selectedSquare === square) {
-                    // Deselect
                     selectedSquare = null;
                     legalMoves = [];
                     renderBoard();
                 } else if (legalMoves.includes(square)) {
-                    // Check for pawn promotion
                     const sourcePiece = game.get(selectedSquare);
                     const isPromotion = sourcePiece && sourcePiece.type === 'p' && ((sourcePiece.color === 'w' && square[1] === '8') || (sourcePiece.color === 'b' && square[1] === '1'));
 
@@ -788,7 +811,6 @@
                         executeMove({ from: selectedSquare, to: square, promotion: 'q' });
                     }
                 } else {
-                    // Select new piece if clicking own piece
                     if (piece && piece.color === game.turn()) {
                         selectedSquare = square;
                         const moves = game.moves({ square: square, verbose: true });
@@ -829,8 +851,7 @@
             }
         }
 
-        // --- STREAMING_CHUNK:Building Bot AI & Game UI Updates... ---
-        // BOT AI LOGIC (Minimax / Heuristic Evaluation)
+        // --- BOT AI & GAME UI ---
         function makeBotMove() {
             if (game.game_over()) return;
 
@@ -838,12 +859,9 @@
             if (moves.length === 0) return;
 
             let chosenMove;
-
             if (botDifficulty === 'easy') {
-                // Random legal move
                 chosenMove = moves[Math.floor(Math.random() * moves.length)];
             } else if (botDifficulty === 'medium') {
-                // Capture preference or random
                 const captures = moves.filter(m => m.captured);
                 if (captures.length > 0 && Math.random() > 0.3) {
                     chosenMove = captures[Math.floor(Math.random() * captures.length)];
@@ -851,15 +869,12 @@
                     chosenMove = moves[Math.floor(Math.random() * moves.length)];
                 }
             } else {
-                // Hard: Minimax depth 2 with piece-square values
                 let bestScore = -99999;
                 let bestMoves = [];
-
                 for (let m of moves) {
                     game.move(m);
                     let score = -evaluateBoard();
                     game.undo();
-
                     if (score > bestScore) {
                         bestScore = score;
                         bestMoves = [m];
@@ -893,15 +908,11 @@
             return totalEvaluation;
         }
 
-        // UI UPDATES & HISTORY
         function updateGameUI() {
-            const turnColor = game.turn() === 'w' ? 'White' : 'Black';
             const isMyTurn = (game.turn() === (playerColor === 'white' ? 'w' : 'b'));
-
             document.getElementById('game-status-text').innerText = isMyTurn ? "Your turn to move" : "Opponent's turn...";
             document.getElementById('self-turn-indicator').innerText = isMyTurn ? "Your Turn" : "Waiting...";
 
-            // Update Move History
             const historyList = document.getElementById('move-history-list');
             const history = game.history({ verbose: true });
             historyList.innerHTML = '';
@@ -927,14 +938,17 @@
             if (game.game_over()) {
                 let title = "Game Over";
                 let subtitle = "The match has ended in a draw.";
+                let isWin = false;
 
                 if (game.in_checkmate()) {
-                    const winner = game.turn() === 'w' ? 'Black' : 'White';
-                    title = "Checkmate!";
-                    subtitle = `${winner} wins the match by checkmate.`;
-                    
-                    const playerTurnChar = playerColor === 'white' ? 'w' : 'b';
-                    if (game.turn() !== playerTurnChar) {
+                    const winnerColorChar = game.turn() === 'w' ? 'b' : 'w';
+                    const playerColorChar = playerColor === 'white' ? 'w' : 'b';
+                    isWin = (winnerColorChar === playerColorChar);
+
+                    title = isWin ? "Victory!" : "Defeat!";
+                    subtitle = isWin ? "You won the match by checkmate!" : "You lost the match by checkmate.";
+
+                    if (isWin) {
                         stats.wins++;
                     } else {
                         stats.losses++;
@@ -951,11 +965,23 @@
                     pushPartyState({ gameStatus: 'gameover' });
                 }
 
-                triggerGameOverModal(title, subtitle);
+                triggerGameOverModal(title, subtitle, isWin);
             }
         }
 
-        function triggerGameOverModal(title, subtitle) {
+        function triggerGameOverModal(title, subtitle, isWin = false) {
+            const iconEl = document.getElementById('gameover-icon');
+            if (isWin) {
+                iconEl.className = "w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-3xl mx-auto shadow-inner";
+                iconEl.innerHTML = '<i class="fa-solid fa-trophy"></i>';
+            } else if (title.includes('Defeat') || title.includes('Resign')) {
+                iconEl.className = "w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl mx-auto shadow-inner";
+                iconEl.innerHTML = '<i class="fa-solid fa-face-frown"></i>';
+            } else {
+                iconEl.className = "w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto shadow-inner";
+                iconEl.innerHTML = '<i class="fa-solid fa-handshake"></i>';
+            }
+
             document.getElementById('gameover-title').innerText = title;
             document.getElementById('gameover-subtitle').innerText = subtitle;
             document.getElementById('modal-gameover').classList.remove('hidden');
@@ -979,20 +1005,42 @@
             }
         }
 
+        // --- RESIGNATION & DRAW ACTIONS ---
         function resignGame() {
             stats.losses++;
             localStorage.setItem('bhess3_stats', JSON.stringify(stats));
             updateStatsUI();
 
             lastSyncedStatus = 'resigned';
+            const opponentColor = playerColor === 'white' ? 'black' : 'white';
+
             if (gameMode === 'party') {
-                pushPartyState({ gameStatus: 'resigned', resignationMessage: `${playerColor.toUpperCase()} resigned. Opponent wins!` });
+                pushPartyState({
+                    gameStatus: 'resigned',
+                    winner: opponentColor
+                });
             }
 
-            triggerGameOverModal("Resignation", `You resigned the match.`);
+            triggerGameOverModal("Defeat", "You resigned the match. Opponent wins!", false);
         }
 
-        function openDrawModal() {
+        function offerDraw() {
+            if (gameMode === 'bot') {
+                showCustomMessage("Bot accepted your draw offer!");
+                stats.draws++;
+                localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+                updateStatsUI();
+                triggerGameOverModal("Match Drawn", "Match ended in a draw with bot.", false);
+                return;
+            }
+
+            // Party mode draw offer
+            pushPartyState({ drawOfferBy: playerColor });
+            showCustomMessage("Draw offer sent to opponent.");
+        }
+
+        function acceptDrawOffer() {
+            document.getElementById('modal-draw-offer').classList.add('hidden');
             stats.draws++;
             localStorage.setItem('bhess3_stats', JSON.stringify(stats));
             updateStatsUI();
@@ -1002,55 +1050,12 @@
                 pushPartyState({ gameStatus: 'draw' });
             }
 
-            triggerGameOverModal("Match Drawn", "Match ended in a mutual draw.");
-        }
-                } else {
-                    stats.draws++;
-                }
-
-                localStorage.setItem('bhess3_stats', JSON.stringify(stats));
-                updateStatsUI();
-
-                // Show Game Over modal
-                document.getElementById('gameover-title').innerText = title;
-                document.getElementById('gameover-subtitle').innerText = subtitle;
-                document.getElementById('modal-gameover').classList.remove('hidden');
-            }
+            triggerGameOverModal("Match Drawn", "Both players agreed to a draw.", false);
         }
 
-        function updateStatsUI() {
-            const total = stats.wins + stats.losses + stats.draws;
-            const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : 0;
-            document.getElementById('stat-wins').innerText = stats.wins;
-            document.getElementById('stat-losses').innerText = stats.losses;
-            document.getElementById('stat-draws').innerText = stats.draws;
-            document.getElementById('stat-winrate').innerText = `${winRate}%`;
-        }
-
-        function restartGame() {
-            if (gameMode === 'bot') {
-                startBotGame();
-            } else {
-                createParty();
-            }
-        }
-
-        function resignGame() {
-            stats.losses++;
-            localStorage.setItem('bhess3_stats', JSON.stringify(stats));
-            updateStatsUI();
-
-            document.getElementById('gameover-title').innerText = "Resignation";
-            document.getElementById('gameover-subtitle').innerText = "You resigned the match.";
-            document.getElementById('modal-gameover').classList.remove('hidden');
-        }
-
-        function openDrawModal() {
-            showCustomMessage("Draw offered. Match recorded as a draw.");
-            stats.draws++;
-            localStorage.setItem('bhess3_stats', JSON.stringify(stats));
-            updateStatsUI();
-            switchView('home');
+        function declineDrawOffer() {
+            document.getElementById('modal-draw-offer').classList.add('hidden');
+            showCustomMessage("You declined the draw offer.");
         }
 
         function copyPartyCode() {
@@ -1081,7 +1086,6 @@
         }
 
         function showCustomMessage(msg) {
-            // Toast notification banner
             const toast = document.createElement('div');
             toast.className = "fixed bottom-5 right-5 z-50 bg-dark-700 border border-cyan-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-sm animate-bounce";
             toast.innerHTML = `<i class="fa-solid fa-circle-info text-cyan-400 text-lg"></i><span>${msg}</span>`;
