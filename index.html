@@ -487,19 +487,20 @@
         let pendingPromotion = null;
         let partySyncInterval = null;
         let lastSyncedFen = '';
+        let lastSyncedStatus = 'active';
 
         // Statistics
         let stats = JSON.parse(localStorage.getItem('bhess3_stats')) || { wins: 0, losses: 0, draws: 0 };
         updateStatsUI();
 
-        // Unicode chess pieces mapping
+        // Unified piece symbols (using preferred clean white piece set for both sides with subtle dark border/contrast for black)
         const pieceSymbols = {
-            'p': { w: '♙', b: '♟' },
-            'r': { w: '♖', b: '♜' },
-            'n': { w: '♘', b: '♞' },
-            'b': { w: '♗', b: '♝' },
-            'q': { w: '♕', b: '♛' },
-            'k': { w: '♔', b: '♚' }
+            'p': { w: '♙', b: '♙' },
+            'r': { w: '♖', b: '♖' },
+            'n': { w: '♘', b: '♘' },
+            'b': { w: '♗', b: '♗' },
+            'q': { w: '♕', b: '♕' },
+            'k': { w: '♔', b: '♔' }
         };
 
         // --- NAVIGATION & VIEWS ---
@@ -583,7 +584,7 @@
                 fen: game.fen(),
                 history: game.history(),
                 turn: game.turn(),
-                status: 'waiting',
+                status: 'active',
                 lastUpdate: Date.now()
             }));
 
@@ -643,17 +644,26 @@
         function startPartySync() {
             stopPartySync();
             lastSyncedFen = game.fen();
+            // Optimized interval (350ms) for snappy real-time party updates
             partySyncInterval = setInterval(() => {
                 if (!partyCode) return;
                 const roomData = localStorage.getItem(`bhess3_room_${partyCode}`);
                 if (!roomData) return;
                 const roomObj = JSON.parse(roomData);
 
-                if (roomObj.status === 'waiting' && partyRole === 'joiner') {
-                    // Waiting status
-                } else if (roomObj.status === 'active' && partyRole === 'host') {
+                if (roomObj.status === 'active' && partyRole === 'host') {
                     document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span><span>Connected</span>';
                     document.getElementById('opponent-name').innerText = 'Guest (Black)';
+                }
+
+                // Check for game status changes (e.g. resignation, draw, checkmate)
+                if (roomObj.gameStatus && roomObj.gameStatus !== 'active' && lastSyncedStatus === 'active') {
+                    lastSyncedStatus = roomObj.gameStatus;
+                    if (roomObj.gameStatus === 'resigned') {
+                        triggerGameOverModal("Resignation", roomObj.resignationMessage || "Match ended by resignation.");
+                    } else if (roomObj.gameStatus === 'draw') {
+                        triggerGameOverModal("Match Drawn", "The game ended in a draw.");
+                    }
                 }
 
                 if (roomObj.fen !== game.fen() && roomObj.fen !== lastSyncedFen) {
@@ -665,7 +675,7 @@
                     updateGameUI();
                     checkGameOverCondition();
                 }
-            }, 1000);
+            }, 350);
         }
 
         function stopPartySync() {
@@ -675,16 +685,19 @@
             }
         }
 
-        function pushPartyState() {
+        function pushPartyState(extraFields = {}) {
             if (gameMode !== 'party' || !partyCode) return;
             lastSyncedFen = game.fen();
-            localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify({
+            const payload = {
                 fen: game.fen(),
                 history: game.history(),
                 turn: game.turn(),
                 status: 'active',
-                lastUpdate: Date.now()
-            }));
+                gameStatus: lastSyncedStatus,
+                lastUpdate: Date.now(),
+                ...extraFields
+            };
+            localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify(payload));
         }
 
         // --- STREAMING_CHUNK:Building Chess Rendering & Interaction Logic... ---
@@ -698,7 +711,6 @@
 
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
-                    // Adjust row/col for board orientation
                     const row = isFlipped ? 7 - r : r;
                     const col = isFlipped ? 7 - c : c;
 
@@ -710,28 +722,30 @@
                     sqDiv.className = `w-full h-full flex items-center justify-center text-3xl sm:text-4xl lg:text-5xl font-bold cursor-pointer select-none transition-colors relative ${isLight ? 'square-light' : 'square-dark'}`;
                     sqDiv.dataset.square = squareCoord;
 
-                    // Highlight selected square
                     if (selectedSquare === squareCoord) {
                         sqDiv.classList.add('selected');
                     }
 
-                    // Highlight legal move targets
                     if (legalMoves.includes(squareCoord)) {
                         const dot = document.createElement('div');
                         dot.className = 'w-4 h-4 rounded-full bg-emerald-500/80 absolute z-10 shadow-md animate-pulse';
                         sqDiv.appendChild(dot);
                     }
 
-                    // Render piece symbol
                     if (piece) {
+                        // Unified piece styling (using preferred white piece look for both sides with black pieces outlined/contrasted)
                         const symbol = pieceSymbols[piece.type][piece.color];
                         const span = document.createElement('span');
-                        span.className = `z-0 transform transition hover:scale-110 ${piece.color === 'w' ? 'text-gray-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]' : 'text-gray-900 drop-shadow-[0_1px_2px_rgba(255,255,255,0.4)]'}`;
+                        if (piece.color === 'w') {
+                            span.className = 'z-0 text-gray-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] transform transition hover:scale-110';
+                        } else {
+                            // Unified preferred style with distinct outline/contrast for black pieces so they stand out clearly
+                            span.className = 'z-0 text-gray-100 drop-shadow-[0_0_2px_#000,0_0_2px_#000,0_2px_4px_rgba(0,0,0,0.9)] transform transition hover:scale-110';
+                        }
                         span.innerText = symbol;
                         sqDiv.appendChild(span);
                     }
 
-                    // Click handler
                     sqDiv.onclick = () => handleSquareClick(squareCoord);
                     container.appendChild(sqDiv);
                 }
@@ -913,8 +927,6 @@
             if (game.game_over()) {
                 let title = "Game Over";
                 let subtitle = "The match has ended in a draw.";
-                let isWin = false;
-                let isLoss = false;
 
                 if (game.in_checkmate()) {
                     const winner = game.turn() === 'w' ? 'Black' : 'White';
@@ -924,11 +936,74 @@
                     const playerTurnChar = playerColor === 'white' ? 'w' : 'b';
                     if (game.turn() !== playerTurnChar) {
                         stats.wins++;
-                        isWin = true;
                     } else {
                         stats.losses++;
-                        isLoss = true;
                     }
+                } else {
+                    stats.draws++;
+                }
+
+                localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+                updateStatsUI();
+
+                lastSyncedStatus = 'gameover';
+                if (gameMode === 'party') {
+                    pushPartyState({ gameStatus: 'gameover' });
+                }
+
+                triggerGameOverModal(title, subtitle);
+            }
+        }
+
+        function triggerGameOverModal(title, subtitle) {
+            document.getElementById('gameover-title').innerText = title;
+            document.getElementById('gameover-subtitle').innerText = subtitle;
+            document.getElementById('modal-gameover').classList.remove('hidden');
+        }
+
+        function updateStatsUI() {
+            const total = stats.wins + stats.losses + stats.draws;
+            const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : 0;
+            document.getElementById('stat-wins').innerText = stats.wins;
+            document.getElementById('stat-losses').innerText = stats.losses;
+            document.getElementById('stat-draws').innerText = stats.draws;
+            document.getElementById('stat-winrate').innerText = `${winRate}%`;
+        }
+
+        function restartGame() {
+            lastSyncedStatus = 'active';
+            if (gameMode === 'bot') {
+                startBotGame();
+            } else {
+                createParty();
+            }
+        }
+
+        function resignGame() {
+            stats.losses++;
+            localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+            updateStatsUI();
+
+            lastSyncedStatus = 'resigned';
+            if (gameMode === 'party') {
+                pushPartyState({ gameStatus: 'resigned', resignationMessage: `${playerColor.toUpperCase()} resigned. Opponent wins!` });
+            }
+
+            triggerGameOverModal("Resignation", `You resigned the match.`);
+        }
+
+        function openDrawModal() {
+            stats.draws++;
+            localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+            updateStatsUI();
+
+            lastSyncedStatus = 'draw';
+            if (gameMode === 'party') {
+                pushPartyState({ gameStatus: 'draw' });
+            }
+
+            triggerGameOverModal("Match Drawn", "Match ended in a mutual draw.");
+        }
                 } else {
                     stats.draws++;
                 }
