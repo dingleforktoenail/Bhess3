@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhess3 - Modern Chess Arena</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chess.js for full legal move validation & game state -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- Custom Theme Config & Styles -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            900: '#090d16',
+                            800: '#111827',
+                            700: '#1f2937',
+                            600: '#374151',
+                        },
+                        neon: {
+                            cyan: '#06b6d4',
+                            emerald: '#10b981',
+                            purple: '#8b5cf6',
+                            amber: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        h1, h2, h3, h4, .font-heading {
+            font-family: 'Outfit', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        /* Chessboard custom square themes */
+        .square-light {
+            background-color: #e2e8f0;
+            color: #0f172a;
+        }
+        .square-dark {
+            background-color: #3b82f6;
+            color: #f8fafc;
+        }
+        .square-light.selected {
+            background-color: #93c5fd !important;
+        }
+        .square-dark.selected {
+            background-color: #1d4ed8 !important;
+        }
+        .square-light.highlight {
+            background-color: #fde047 !important;
+        }
+        .square-dark.highlight {
+            background-color: #eab308 !important;
+        }
+        .square-light.last-move {
+            background-color: #cbd5e1 !important;
+        }
+        .square-dark.last-move {
+            background-color: #2563eb !important;
+        }
+        /* Neon glow effects */
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.35);
+        }
+        .glow-purple {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);
+        }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.02); }
+        }
+        .animate-glow {
+            animation: pulseGlow 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-gradient-to-br from-dark-900 via-dark-800 to-black text-gray-100">
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-dark-800/80 backdrop-blur sticky top-0 z-50 px-4 lg:px-8 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('home')">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center glow-cyan">
+                <i class="fa-solid fa-chess-knight text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-extrabold tracking-wider bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 bg-clip-text text-transparent">BHESS3</h1>
+                <p class="text-xs text-gray-400 font-medium">Next-Gen Web Chess Arena</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="openStatsModal()" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm font-medium transition text-gray-300 flex items-center space-x-2 border border-gray-700">
+                <i class="fa-solid fa-trophy text-amber-400"></i>
+                <span class="hidden sm:inline">Stats</span>
+            </button>
+            <button onclick="openRulesModal()" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm font-medium transition text-gray-300 flex items-center space-x-2 border border-gray-700">
+                <i class="fa-solid fa-circle-question text-cyan-400"></i>
+                <span class="hidden sm:inline">How to Play</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
+
+        <!-- VIEW 1: HOME SCREEN -->
+        <div id="view-home" class="view-section grid grid-cols-1 lg:grid-cols-12 gap-8 items-center py-6">
+            <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold uppercase tracking-wider">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <span>Multiplayer & Bot Training Arena</span>
+                </div>
+                <h2 class="text-4xl sm:text-6xl font-extrabold tracking-tight font-heading leading-tight">
+                    Master the Board in <span class="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">Bhess3</span>
+                </h2>
+                <p class="text-gray-400 text-lg max-w-xl mx-auto lg:mx-0">
+                    Challenge smart AI bots across 3 difficulty tiers, or instantly create a private party room to battle friends online with instant code sharing.
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
+                    <button onclick="showSection('view-party-setup')" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold shadow-lg shadow-cyan-500/25 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3 text-base">
+                        <i class="fa-solid fa-users text-lg"></i>
+                        <span>Party Match</span>
+                    </button>
+                    <button onclick="showSection('view-bot-setup')" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold shadow-lg shadow-purple-600/25 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3 text-base">
+                        <i class="fa-solid fa-robot text-lg"></i>
+                        <span>Play vs Bot</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hero Graphic / Quick Stats Card -->
+            <div class="lg:col-span-5">
+                <div class="bg-dark-800/90 border border-gray-700/80 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden glow-purple">
+                    <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div class="absolute -left-10 -top-10 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    
+                    <h3 class="text-xl font-bold font-heading mb-4 flex items-center justify-between">
+                        <span>Arena Statistics</span>
+                        <i class="fa-solid fa-chart-line text-cyan-400"></i>
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="bg-dark-900/60 p-4 rounded-xl border border-gray-700/50 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">W</div>
+                                <div>
+                                    <p class="text-xs text-gray-400">Victories</p>
+                                    <p id="stat-wins" class="text-lg font-bold">0</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-400">Win Rate</p>
+                                <p id="stat-winrate" class="text-lg font-bold text-emerald-400">0%</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-dark-900/60 p-4 rounded-xl border border-gray-700/50">
+                                <p class="text-xs text-gray-400">Losses</p>
+                                <p id="stat-losses" class="text-lg font-bold text-rose-400">0</p>
+                            </div>
+                            <div class="bg-dark-900/60 p-4 rounded-xl border border-gray-700/50">
+                                <p class="text-xs text-gray-400">Draws</p>
+                                <p id="stat-draws" class="text-lg font-bold text-amber-400">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-gray-700/60 flex items-center justify-between text-xs text-gray-400">
+                        <span>Engine: Chess.js v0.10.3</span>
+                        <span class="text-cyan-400 flex items-center space-x-1"><i class="fa-solid fa-shield-halved"></i> <span>Secure Sync</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: PARTY SETUP -->
+        <div id="view-party-setup" class="view-section hidden max-w-xl mx-auto w-full py-8">
+            <button onclick="switchView('home')" class="mb-6 text-sm text-gray-400 hover:text-white flex items-center space-x-2 transition">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Back to Home</span>
+            </button>
+            <div class="bg-dark-800 border border-gray-700 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+                <div>
+                    <h3 class="text-2xl font-bold font-heading">Party Match (1v1 Online/Tab Sync)</h3>
+                    <p class="text-gray-400 text-sm mt-1">Create a party code to invite a friend, or enter an existing code to join their game.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <!-- Create Party Card -->
+                    <div class="bg-dark-900/80 p-5 rounded-xl border border-cyan-500/30 flex flex-col justify-between space-y-4">
+                        <div>
+                            <div class="w-10 h-10 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-3 text-lg font-bold">
+                                <i class="fa-solid fa-plus"></i>
+                            </div>
+                            <h4 class="font-bold text-lg">Create Party</h4>
+                            <p class="text-xs text-gray-400 mt-1">Generate a secure 6-character room code and wait for opponent as White.</p>
+                        </div>
+                        <button onclick="createParty()" class="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-dark-900 font-bold transition shadow-md shadow-cyan-500/20">
+                            Create Room
+                        </button>
+                    </div>
+
+                    <!-- Join Party Card -->
+                    <div class="bg-dark-900/80 p-5 rounded-xl border border-purple-500/30 flex flex-col justify-between space-y-4">
+                        <div>
+                            <div class="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center mb-3 text-lg font-bold">
+                                <i class="fa-solid fa-right-to-bracket"></i>
+                            </div>
+                            <h4 class="font-bold text-lg">Join Party</h4>
+                            <p class="text-xs text-gray-400 mt-1">Enter your friend's 6-character code to join as Black.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <input type="text" id="input-join-code" placeholder="e.g. A9B2C4" maxlength="6" class="w-full px-4 py-2.5 bg-dark-800 border border-gray-700 rounded-lg text-center uppercase tracking-widest text-lg font-mono focus:outline-none focus:border-purple-500">
+                            <button onclick="joinParty()" class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition shadow-md shadow-purple-600/20">
+                                Join Room
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: BOT SETUP -->
+        <div id="view-bot-setup" class="view-section hidden max-w-xl mx-auto w-full py-8">
+            <button onclick="switchView('home')" class="mb-6 text-sm text-gray-400 hover:text-white flex items-center space-x-2 transition">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Back to Home</span>
+            </button>
+            <div class="bg-dark-800 border border-gray-700 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+                <div>
+                    <h3 class="text-2xl font-bold font-heading">Play vs Bot</h3>
+                    <p class="text-gray-400 text-sm mt-1">Choose your bot opponent and side to begin training.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Select Difficulty</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button onclick="selectBotDifficulty('easy')" id="btn-bot-easy" class="bot-diff-btn p-4 rounded-xl border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 font-bold transition flex flex-col items-center justify-center space-y-1">
+                            <i class="fa-solid fa-face-smile text-xl"></i>
+                            <span>Easy</span>
+                            <span class="text-xs font-normal text-gray-400">~800 ELO</span>
+                        </button>
+                        <button onclick="selectBotDifficulty('medium')" id="btn-bot-medium" class="bot-diff-btn p-4 rounded-xl border border-gray-700 bg-dark-900 text-gray-300 font-bold transition flex flex-col items-center justify-center space-y-1 hover:border-amber-500/50">
+                            <i class="fa-solid fa-face-grimace text-xl"></i>
+                            <span>Medium</span>
+                            <span class="text-xs font-normal text-gray-400">~1500 ELO</span>
+                        </button>
+                        <button onclick="selectBotDifficulty('hard')" id="btn-bot-hard" class="bot-diff-btn p-4 rounded-xl border border-gray-700 bg-dark-900 text-gray-300 font-bold transition flex flex-col items-center justify-center space-y-1 hover:border-rose-500/50">
+                            <i class="fa-solid fa-robot text-xl"></i>
+                            <span>Hard</span>
+                            <span class="text-xs font-normal text-gray-400">~2200 ELO</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Choose Side</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="selectBotSide('white')" id="btn-side-white" class="py-3 px-4 rounded-xl border border-cyan-500 bg-cyan-500/10 text-cyan-400 font-bold transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-chess-pawn text-lg"></i>
+                            <span>White (First)</span>
+                        </button>
+                        <button onclick="selectBotSide('black')" id="btn-side-black" class="py-3 px-4 rounded-xl border border-gray-700 bg-dark-900 text-gray-300 font-bold transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-chess-king text-lg"></i>
+                            <span>Black</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="startBotGame()" class="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold transition shadow-lg shadow-purple-600/25 flex items-center justify-center space-x-2 text-base">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Start Match</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW 4: CHESS GAME ARENA -->
+        <div id="view-game" class="view-section hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-start py-4">
+            
+            <!-- Left/Top Sidebar: Player Info & Captured Pieces -->
+            <div class="lg:col-span-4 flex flex-col space-y-4">
+                <!-- Opponent Card -->
+                <div class="bg-dark-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between shadow-lg">
+                    <div class="flex items-center space-x-3">
+                        <div id="opponent-avatar" class="w-12 h-12 rounded-xl bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div>
+                            <h4 id="opponent-name" class="font-bold text-base">Bot (Medium)</h4>
+                            <p id="opponent-status" class="text-xs text-gray-400 flex items-center space-x-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                                <span>Connected</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div id="opponent-timer" class="text-xl font-mono font-bold text-gray-200">10:00</div>
+                        <div id="opponent-captured" class="text-xs text-gray-400 mt-1 min-h-[16px]"></div>
+                    </div>
+                </div>
+
+                <!-- Game Status Banner -->
+                <div id="game-status-banner" class="bg-dark-800/90 border border-cyan-500/30 rounded-xl p-3 text-center text-sm font-medium text-cyan-400 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span id="game-status-text">Your turn to move</span>
+                </div>
+
+                <!-- Party Code Banner (if Party Mode) -->
+                <div id="party-code-banner" class="hidden bg-dark-800 border border-purple-500/30 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Party Room Code</p>
+                        <p id="display-party-code" class="text-xl font-mono font-bold text-purple-400 tracking-widest mt-0.5">------</p>
+                    </div>
+                    <button onclick="copyPartyCode()" class="px-3 py-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-bold transition border border-purple-500/40">
+                        <i class="fa-regular fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+
+                <!-- Move History Log Card -->
+                <div class="bg-dark-800 border border-gray-700 rounded-xl p-4 shadow-lg flex flex-col h-64 lg:h-72">
+                    <h5 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2 flex items-center justify-between">
+                        <span>Move History</span>
+                        <i class="fa-solid fa-list-ol text-cyan-400"></i>
+                    </h5>
+                    <div id="move-history-list" class="flex-1 overflow-y-auto space-y-1 pr-2 font-mono text-sm">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Game Action Buttons -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="resignGame()" class="py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-sm transition border border-rose-500/30 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-flag"></i>
+                        <span>Resign</span>
+                    </button>
+                    <button onclick="openDrawModal()" class="py-2.5 rounded-xl bg-dark-700 hover:bg-dark-600 text-gray-300 font-semibold text-sm transition border border-gray-700 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-handshake"></i>
+                        <span>Offer Draw</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Center: Interactive Chessboard -->
+            <div class="lg:col-span-8 flex flex-col items-center">
+                <div class="bg-dark-800 border border-gray-700 rounded-2xl p-4 sm:p-6 shadow-2xl relative">
+                    <!-- Board Container -->
+                    <div id="chessboard-container" class="w-[340px] h-[340px] sm:w-[480px] sm:h-[480px] lg:w-[540px] lg:h-[540px] grid grid-cols-8 grid-rows-8 rounded-lg overflow-hidden shadow-2xl border-4 border-dark-700">
+                        <!-- Rendered by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Player Card (Self) -->
+                <div class="w-full max-w-[340px] sm:max-w-[480px] lg:max-w-[540px] mt-4 bg-dark-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between shadow-lg">
+                    <div class="flex items-center space-x-3">
+                        <div id="self-avatar" class="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <h4 id="self-name" class="font-bold text-base">You (White)</h4>
+                            <p class="text-xs text-emerald-400 flex items-center space-x-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                                <span id="self-turn-indicator">Your Turn</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div id="self-timer" class="text-xl font-mono font-bold text-gray-200">10:00</div>
+                        <div id="self-captured" class="text-xs text-gray-400 mt-1 min-h-[16px]"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- MODAL: Promotion Dialog -->
+    <div id="modal-promotion" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-dark-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
+            <h3 class="text-xl font-bold font-heading">Choose Promotion Piece</h3>
+            <div class="grid grid-cols-4 gap-3 py-2">
+                <button onclick="selectPromotion('q')" class="p-4 rounded-xl bg-dark-700 hover:bg-cyan-500 hover:text-dark-900 transition text-2xl flex items-center justify-center border border-gray-600">♕</button>
+                <button onclick="selectPromotion('r')" class="p-4 rounded-xl bg-dark-700 hover:bg-cyan-500 hover:text-dark-900 transition text-2xl flex items-center justify-center border border-gray-600">♖</button>
+                <button onclick="selectPromotion('b')" class="p-4 rounded-xl bg-dark-700 hover:bg-cyan-500 hover:text-dark-900 transition text-2xl flex items-center justify-center border border-gray-600">♗</button>
+                <button onclick="selectPromotion('n')" class="p-4 rounded-xl bg-dark-700 hover:bg-cyan-500 hover:text-dark-900 transition text-2xl flex items-center justify-center border border-gray-600">♘</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Game Over Dialog -->
+    <div id="modal-gameover" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-dark-800 border border-gray-700 rounded-2xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl">
+            <div id="gameover-icon" class="w-16 h-16 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-3xl mx-auto shadow-inner">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <h3 id="gameover-title" class="text-2xl font-bold font-heading">Checkmate!</h3>
+                <p id="gameover-subtitle" class="text-gray-400 text-sm mt-2">White wins the match by checkmate.</p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="closeGameOverModal(); switchView('home');" class="flex-1 py-3 rounded-xl bg-dark-700 hover:bg-dark-600 font-bold transition text-gray-300">
+                    Main Menu
+                </button>
+                <button onclick="closeGameOverModal(); restartGame();" class="flex-1 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 font-bold transition text-dark-900 shadow-md shadow-cyan-500/25">
+                    Play Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Rules & How to Play -->
+    <div id="modal-rules" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-dark-800 border border-gray-700 rounded-2xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold font-heading flex items-center space-x-2">
+                    <i class="fa-solid fa-circle-question text-cyan-400"></i>
+                    <span>How to Play Bhess3</span>
+                </h3>
+                <button onclick="closeRulesModal()" class="text-gray-400 hover:text-white p-2">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="space-y-4 text-sm text-gray-300 leading-relaxed">
+                <div>
+                    <h4 class="font-bold text-cyan-400 mb-1">Party Mode</h4>
+                    <p>Create a party to generate a 6-character room code. Share this code with a friend so they can join your room. Both players will play in real-time synced via browser storage.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-purple-400 mb-1">Play vs Bot</h4>
+                    <p>Practice against custom AI engines ranging from Easy (~800 ELO) to Hard (~2200 ELO). Choose your starting color and test your tactical openings.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-emerald-400 mb-1">Chess Controls</h4>
+                    <p>Click any of your pieces to highlight legal move squares, then click a highlighted destination square to make your move. Standard chess rules apply (castling, en passant, promotion, checkmate).</p>
+                </div>
+            </div>
+            <button onclick="closeRulesModal()" class="w-full py-3 rounded-xl bg-dark-700 hover:bg-dark-600 font-bold transition text-white">
+                Got It
+            </button>
+        </div>
+    </div>
+
+    <!-- Application Logic Script -->
+    <script>
+        // --- GLOBAL GAME STATE ---
+        let game = new Chess();
+        let gameMode = 'bot'; // 'bot' or 'party'
+        let botDifficulty = 'easy'; // 'easy', 'medium', 'hard'
+        let playerColor = 'white'; // 'white' or 'black'
+        let partyCode = null;
+        let partyRole = null; // 'host' or 'joiner'
+        let selectedSquare = null;
+        let legalMoves = [];
+        let pendingPromotion = null;
+        let partySyncInterval = null;
+        let lastSyncedFen = '';
+
+        // Statistics
+        let stats = JSON.parse(localStorage.getItem('bhess3_stats')) || { wins: 0, losses: 0, draws: 0 };
+        updateStatsUI();
+
+        // Unicode chess pieces mapping
+        const pieceSymbols = {
+            'p': { w: '♙', b: '♟' },
+            'r': { w: '♖', b: '♜' },
+            'n': { w: '♘', b: '♞' },
+            'b': { w: '♗', b: '♝' },
+            'q': { w: '♕', b: '♛' },
+            'k': { w: '♔', b: '♚' }
+        };
+
+        // --- NAVIGATION & VIEWS ---
+        function switchView(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            if (viewName === 'home') {
+                document.getElementById('view-home').classList.remove('hidden');
+                stopPartySync();
+            } else if (viewName === 'party-setup') {
+                document.getElementById('view-party-setup').classList.remove('hidden');
+            } else if (viewName === 'bot-setup') {
+                document.getElementById('view-bot-setup').classList.remove('hidden');
+            } else if (viewName === 'game') {
+                document.getElementById('view-game').classList.remove('hidden');
+            }
+        }
+
+        function showSection(id) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        // --- BOT SETUP & CONFIG ---
+        function selectBotDifficulty(diff) {
+            botDifficulty = diff;
+            document.querySelectorAll('.bot-diff-btn').forEach(btn => {
+                btn.className = "bot-diff-btn p-4 rounded-xl border border-gray-700 bg-dark-900 text-gray-300 font-bold transition flex flex-col items-center justify-center space-y-1 hover:border-gray-500";
+            });
+            const activeBtn = document.getElementById(`btn-bot-${diff}`);
+            if (diff === 'easy') activeBtn.className = "bot-diff-btn p-4 rounded-xl border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 font-bold transition flex flex-col items-center justify-center space-y-1";
+            if (diff === 'medium') activeBtn.className = "bot-diff-btn p-4 rounded-xl border border-amber-500/50 bg-amber-500/10 text-amber-400 font-bold transition flex flex-col items-center justify-center space-y-1";
+            if (diff === 'hard') activeBtn.className = "bot-diff-btn p-4 rounded-xl border border-rose-500/50 bg-rose-500/10 text-rose-400 font-bold transition flex flex-col items-center justify-center space-y-1";
+        }
+
+        function selectBotSide(side) {
+            playerColor = side;
+            document.getElementById('btn-side-white').className = "py-3 px-4 rounded-xl border border-gray-700 bg-dark-900 text-gray-300 font-bold transition flex items-center justify-center space-x-2";
+            document.getElementById('btn-side-black').className = "py-3 px-4 rounded-xl border border-gray-700 bg-dark-900 text-gray-300 font-bold transition flex items-center justify-center space-x-2";
+            if (side === 'white') {
+                document.getElementById('btn-side-white').className = "py-3 px-4 rounded-xl border border-cyan-500 bg-cyan-500/10 text-cyan-400 font-bold transition flex items-center justify-center space-x-2";
+            } else {
+                document.getElementById('btn-side-black').className = "py-3 px-4 rounded-xl border border-cyan-500 bg-cyan-500/10 text-cyan-400 font-bold transition flex items-center justify-center space-x-2";
+            }
+        }
+
+        function startBotGame() {
+            gameMode = 'bot';
+            game = new Chess();
+            selectedSquare = null;
+            legalMoves = [];
+            
+            // Update UI headers
+            document.getElementById('opponent-avatar').innerHTML = '<i class="fa-solid fa-robot"></i>';
+            document.getElementById('opponent-name').innerText = `Bot (${botDifficulty.toUpperCase()})`;
+            document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span><span>Online</span>';
+            document.getElementById('self-name').innerText = `You (${playerColor.charAt(0).toUpperCase() + playerColor.slice(1)})`;
+            document.getElementById('party-code-banner').classList.add('hidden');
+            
+            switchView('game');
+            renderBoard();
+            updateGameUI();
+
+            // If player chose black, bot makes first move
+            if (playerColor === 'black') {
+                setTimeout(makeBotMove, 500);
+            }
+        }
+
+        // --- PARTY SETUP & SYNC ---
+        function createParty() {
+            partyCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            partyRole = 'host';
+            playerColor = 'white';
+            gameMode = 'party';
+            game = new Chess();
+            selectedSquare = null;
+            legalMoves = [];
+
+            // Save initial room state to localStorage
+            localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify({
+                fen: game.fen(),
+                history: game.history(),
+                turn: game.turn(),
+                status: 'waiting',
+                lastUpdate: Date.now()
+            }));
+
+            // Update UI
+            document.getElementById('opponent-avatar').innerHTML = '<i class="fa-solid fa-users"></i>';
+            document.getElementById('opponent-name').innerText = 'Waiting for opponent...';
+            document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block"></span><span>Waiting</span>';
+            document.getElementById('self-name').innerText = 'You (White - Host)';
+            document.getElementById('display-party-code').innerText = partyCode;
+            document.getElementById('party-code-banner').classList.remove('hidden');
+
+            switchView('game');
+            renderBoard();
+            updateGameUI();
+            startPartySync();
+        }
+
+        function joinParty() {
+            const codeInput = document.getElementById('input-join-code').value.trim().toUpperCase();
+            if (codeInput.length !== 6) {
+                showCustomMessage('Please enter a valid 6-character room code.');
+                return;
+            }
+
+            const roomData = localStorage.getItem(`bhess3_room_${codeInput}`);
+            if (!roomData) {
+                showCustomMessage('Room not found or expired. Please check the code.');
+                return;
+            }
+
+            partyCode = codeInput;
+            partyRole = 'joiner';
+            playerColor = 'black';
+            gameMode = 'party';
+
+            const roomObj = JSON.parse(roomData);
+            roomObj.status = 'active';
+            roomObj.lastUpdate = Date.now();
+            localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify(roomObj));
+
+            game.load(roomObj.fen);
+
+            // Update UI
+            document.getElementById('opponent-avatar').innerHTML = '<i class="fa-solid fa-user-shield"></i>';
+            document.getElementById('opponent-name').innerText = 'Host (White)';
+            document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span><span>Connected</span>';
+            document.getElementById('self-name').innerText = 'You (Black - Guest)';
+            document.getElementById('display-party-code').innerText = partyCode;
+            document.getElementById('party-code-banner').classList.remove('hidden');
+
+            switchView('game');
+            renderBoard();
+            updateGameUI();
+            startPartySync();
+        }
+
+        function startPartySync() {
+            stopPartySync();
+            lastSyncedFen = game.fen();
+            partySyncInterval = setInterval(() => {
+                if (!partyCode) return;
+                const roomData = localStorage.getItem(`bhess3_room_${partyCode}`);
+                if (!roomData) return;
+                const roomObj = JSON.parse(roomData);
+
+                if (roomObj.status === 'waiting' && partyRole === 'joiner') {
+                    // Waiting status
+                } else if (roomObj.status === 'active' && partyRole === 'host') {
+                    document.getElementById('opponent-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span><span>Connected</span>';
+                    document.getElementById('opponent-name').innerText = 'Guest (Black)';
+                }
+
+                if (roomObj.fen !== game.fen() && roomObj.fen !== lastSyncedFen) {
+                    game.load(roomObj.fen);
+                    lastSyncedFen = roomObj.fen;
+                    selectedSquare = null;
+                    legalMoves = [];
+                    renderBoard();
+                    updateGameUI();
+                    checkGameOverCondition();
+                }
+            }, 1000);
+        }
+
+        function stopPartySync() {
+            if (partySyncInterval) {
+                clearInterval(partySyncInterval);
+                partySyncInterval = null;
+            }
+        }
+
+        function pushPartyState() {
+            if (gameMode !== 'party' || !partyCode) return;
+            lastSyncedFen = game.fen();
+            localStorage.setItem(`bhess3_room_${partyCode}`, JSON.stringify({
+                fen: game.fen(),
+                history: game.history(),
+                turn: game.turn(),
+                status: 'active',
+                lastUpdate: Date.now()
+            }));
+        }
+
+        // --- STREAMING_CHUNK:Building Chess Rendering & Interaction Logic... ---
+        // RENDER CHESSBOARD
+        function renderBoard() {
+            const container = document.getElementById('chessboard-container');
+            container.innerHTML = '';
+
+            const board = game.board();
+            const isFlipped = (playerColor === 'black');
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    // Adjust row/col for board orientation
+                    const row = isFlipped ? 7 - r : r;
+                    const col = isFlipped ? 7 - c : c;
+
+                    const squareCoord = String.fromCharCode(97 + col) + (8 - row);
+                    const piece = board[row][col];
+                    const isLight = (row + col) % 2 === 0;
+
+                    const sqDiv = document.createElement('div');
+                    sqDiv.className = `w-full h-full flex items-center justify-center text-3xl sm:text-4xl lg:text-5xl font-bold cursor-pointer select-none transition-colors relative ${isLight ? 'square-light' : 'square-dark'}`;
+                    sqDiv.dataset.square = squareCoord;
+
+                    // Highlight selected square
+                    if (selectedSquare === squareCoord) {
+                        sqDiv.classList.add('selected');
+                    }
+
+                    // Highlight legal move targets
+                    if (legalMoves.includes(squareCoord)) {
+                        const dot = document.createElement('div');
+                        dot.className = 'w-4 h-4 rounded-full bg-emerald-500/80 absolute z-10 shadow-md animate-pulse';
+                        sqDiv.appendChild(dot);
+                    }
+
+                    // Render piece symbol
+                    if (piece) {
+                        const symbol = pieceSymbols[piece.type][piece.color];
+                        const span = document.createElement('span');
+                        span.className = `z-0 transform transition hover:scale-110 ${piece.color === 'w' ? 'text-gray-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]' : 'text-gray-900 drop-shadow-[0_1px_2px_rgba(255,255,255,0.4)]'}`;
+                        span.innerText = symbol;
+                        sqDiv.appendChild(span);
+                    }
+
+                    // Click handler
+                    sqDiv.onclick = () => handleSquareClick(squareCoord);
+                    container.appendChild(sqDiv);
+                }
+            }
+        }
+
+        // SQUARE CLICK HANDLER
+        function handleSquareClick(square) {
+            // Check if it's player's turn
+            const turnChar = game.turn() === 'w' ? 'white' : 'black';
+            if (gameMode === 'bot' && turnChar !== playerColor) return;
+            if (gameMode === 'party' && turnChar !== playerColor) return;
+            if (game.game_over()) return;
+
+            const piece = game.get(square);
+
+            if (selectedSquare === null) {
+                // Select piece if it belongs to current player
+                if (piece && piece.color === game.turn()) {
+                    selectedSquare = square;
+                    const moves = game.moves({ square: square, verbose: true });
+                    legalMoves = moves.map(m => m.to);
+                    renderBoard();
+                }
+            } else {
+                if (selectedSquare === square) {
+                    // Deselect
+                    selectedSquare = null;
+                    legalMoves = [];
+                    renderBoard();
+                } else if (legalMoves.includes(square)) {
+                    // Check for pawn promotion
+                    const sourcePiece = game.get(selectedSquare);
+                    const isPromotion = sourcePiece && sourcePiece.type === 'p' && ((sourcePiece.color === 'w' && square[1] === '8') || (sourcePiece.color === 'b' && square[1] === '1'));
+
+                    if (isPromotion) {
+                        pendingPromotion = { from: selectedSquare, to: square };
+                        document.getElementById('modal-promotion').classList.remove('hidden');
+                    } else {
+                        executeMove({ from: selectedSquare, to: square, promotion: 'q' });
+                    }
+                } else {
+                    // Select new piece if clicking own piece
+                    if (piece && piece.color === game.turn()) {
+                        selectedSquare = square;
+                        const moves = game.moves({ square: square, verbose: true });
+                        legalMoves = moves.map(m => m.to);
+                        renderBoard();
+                    } else {
+                        selectedSquare = null;
+                        legalMoves = [];
+                        renderBoard();
+                    }
+                }
+            }
+        }
+
+        function selectPromotion(pieceType) {
+            document.getElementById('modal-promotion').classList.add('hidden');
+            if (pendingPromotion) {
+                executeMove({ from: pendingPromotion.from, to: pendingPromotion.to, promotion: pieceType });
+                pendingPromotion = null;
+            }
+        }
+
+        function executeMove(moveObj) {
+            const moveResult = game.move(moveObj);
+            selectedSquare = null;
+            legalMoves = [];
+
+            if (moveResult) {
+                renderBoard();
+                updateGameUI();
+                checkGameOverCondition();
+
+                if (gameMode === 'party') {
+                    pushPartyState();
+                } else if (gameMode === 'bot' && !game.game_over()) {
+                    setTimeout(makeBotMove, 400);
+                }
+            }
+        }
+
+        // --- STREAMING_CHUNK:Building Bot AI & Game UI Updates... ---
+        // BOT AI LOGIC (Minimax / Heuristic Evaluation)
+        function makeBotMove() {
+            if (game.game_over()) return;
+
+            const moves = game.moves({ verbose: true });
+            if (moves.length === 0) return;
+
+            let chosenMove;
+
+            if (botDifficulty === 'easy') {
+                // Random legal move
+                chosenMove = moves[Math.floor(Math.random() * moves.length)];
+            } else if (botDifficulty === 'medium') {
+                // Capture preference or random
+                const captures = moves.filter(m => m.captured);
+                if (captures.length > 0 && Math.random() > 0.3) {
+                    chosenMove = captures[Math.floor(Math.random() * captures.length)];
+                } else {
+                    chosenMove = moves[Math.floor(Math.random() * moves.length)];
+                }
+            } else {
+                // Hard: Minimax depth 2 with piece-square values
+                let bestScore = -99999;
+                let bestMoves = [];
+
+                for (let m of moves) {
+                    game.move(m);
+                    let score = -evaluateBoard();
+                    game.undo();
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMoves = [m];
+                    } else if (score === bestScore) {
+                        bestMoves.push(m);
+                    }
+                }
+                chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+            }
+
+            game.move(chosenMove);
+            renderBoard();
+            updateGameUI();
+            checkGameOverCondition();
+        }
+
+        function evaluateBoard() {
+            const board = game.board();
+            let totalEvaluation = 0;
+            const pieceValues = { p: 10, n: 30, b: 30, r: 50, q: 90, k: 900 };
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const piece = board[r][c];
+                    if (piece) {
+                        const val = pieceValues[piece.type];
+                        totalEvaluation += (piece.color === game.turn()) ? val : -val;
+                    }
+                }
+            }
+            return totalEvaluation;
+        }
+
+        // UI UPDATES & HISTORY
+        function updateGameUI() {
+            const turnColor = game.turn() === 'w' ? 'White' : 'Black';
+            const isMyTurn = (game.turn() === (playerColor === 'white' ? 'w' : 'b'));
+
+            document.getElementById('game-status-text').innerText = isMyTurn ? "Your turn to move" : "Opponent's turn...";
+            document.getElementById('self-turn-indicator').innerText = isMyTurn ? "Your Turn" : "Waiting...";
+
+            // Update Move History
+            const historyList = document.getElementById('move-history-list');
+            const history = game.history({ verbose: true });
+            historyList.innerHTML = '';
+
+            for (let i = 0; i < history.length; i += 2) {
+                const moveNum = Math.floor(i / 2) + 1;
+                const whiteMove = history[i].san;
+                const blackMove = history[i + 1] ? history[i + 1].san : '';
+
+                const rowDiv = document.createElement('div');
+                rowDiv.className = "flex items-center justify-between py-1 px-2 rounded hover:bg-dark-700/50 text-xs";
+                rowDiv.innerHTML = `
+                    <span class="text-gray-500 font-bold w-8">${moveNum}.</span>
+                    <span class="flex-1 text-gray-200">${whiteMove}</span>
+                    <span class="flex-1 text-gray-400">${blackMove}</span>
+                `;
+                historyList.appendChild(rowDiv);
+            }
+            historyList.scrollTop = historyList.scrollHeight;
+        }
+
+        function checkGameOverCondition() {
+            if (game.game_over()) {
+                let title = "Game Over";
+                let subtitle = "The match has ended in a draw.";
+                let isWin = false;
+                let isLoss = false;
+
+                if (game.in_checkmate()) {
+                    const winner = game.turn() === 'w' ? 'Black' : 'White';
+                    title = "Checkmate!";
+                    subtitle = `${winner} wins the match by checkmate.`;
+                    
+                    const playerTurnChar = playerColor === 'white' ? 'w' : 'b';
+                    if (game.turn() !== playerTurnChar) {
+                        stats.wins++;
+                        isWin = true;
+                    } else {
+                        stats.losses++;
+                        isLoss = true;
+                    }
+                } else {
+                    stats.draws++;
+                }
+
+                localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+                updateStatsUI();
+
+                // Show Game Over modal
+                document.getElementById('gameover-title').innerText = title;
+                document.getElementById('gameover-subtitle').innerText = subtitle;
+                document.getElementById('modal-gameover').classList.remove('hidden');
+            }
+        }
+
+        function updateStatsUI() {
+            const total = stats.wins + stats.losses + stats.draws;
+            const winRate = total > 0 ? Math.round((stats.wins / total) * 100) : 0;
+            document.getElementById('stat-wins').innerText = stats.wins;
+            document.getElementById('stat-losses').innerText = stats.losses;
+            document.getElementById('stat-draws').innerText = stats.draws;
+            document.getElementById('stat-winrate').innerText = `${winRate}%`;
+        }
+
+        function restartGame() {
+            if (gameMode === 'bot') {
+                startBotGame();
+            } else {
+                createParty();
+            }
+        }
+
+        function resignGame() {
+            stats.losses++;
+            localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+            updateStatsUI();
+
+            document.getElementById('gameover-title').innerText = "Resignation";
+            document.getElementById('gameover-subtitle').innerText = "You resigned the match.";
+            document.getElementById('modal-gameover').classList.remove('hidden');
+        }
+
+        function openDrawModal() {
+            showCustomMessage("Draw offered. Match recorded as a draw.");
+            stats.draws++;
+            localStorage.setItem('bhess3_stats', JSON.stringify(stats));
+            updateStatsUI();
+            switchView('home');
+        }
+
+        function copyPartyCode() {
+            if (!partyCode) return;
+            const el = document.createElement('textarea');
+            el.value = partyCode;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showCustomMessage('Party code copied to clipboard!');
+        }
+
+        function openStatsModal() {
+            showCustomMessage(`Arena Stats:\nVictories: ${stats.wins}\nLosses: ${stats.losses}\nDraws: ${stats.draws}`);
+        }
+
+        function openRulesModal() {
+            document.getElementById('modal-rules').classList.remove('hidden');
+        }
+
+        function closeRulesModal() {
+            document.getElementById('modal-rules').classList.add('hidden');
+        }
+
+        function closeGameOverModal() {
+            document.getElementById('modal-gameover').classList.add('hidden');
+        }
+
+        function showCustomMessage(msg) {
+            // Toast notification banner
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-5 right-5 z-50 bg-dark-700 border border-cyan-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-sm animate-bounce";
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-cyan-400 text-lg"></i><span>${msg}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
